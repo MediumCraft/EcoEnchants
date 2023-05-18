@@ -1,12 +1,15 @@
 package com.willfp.ecoenchants.enchants
 
 import com.github.benmanes.caffeine.cache.Caffeine
+import com.willfp.eco.core.EcoPlugin
 import com.willfp.eco.core.config.ConfigType
 import com.willfp.eco.core.config.config
 import com.willfp.eco.core.config.interfaces.Config
 import com.willfp.eco.core.config.readConfig
 import com.willfp.eco.core.fast.fast
 import com.willfp.eco.core.placeholder.PlayerStaticPlaceholder
+import com.willfp.eco.core.placeholder.context.PlaceholderContext
+import com.willfp.eco.core.placeholder.templates.SimpleInjectablePlaceholder
 import com.willfp.eco.util.StringUtils
 import com.willfp.eco.util.containsIgnoreCase
 import com.willfp.ecoenchants.EcoEnchantsPlugin
@@ -17,8 +20,13 @@ import com.willfp.ecoenchants.target.EnchantLookup.getEnchantLevel
 import com.willfp.ecoenchants.target.EnchantmentTargets
 import com.willfp.ecoenchants.target.TargetSlot
 import com.willfp.ecoenchants.type.EnchantmentTypes
+import com.willfp.libreforge.SilentViolationContext
+import com.willfp.libreforge.ViolationContext
+import com.willfp.libreforge.conditions.ConditionList
 import com.willfp.libreforge.conditions.Conditions
-import com.willfp.libreforge.conditions.ConfiguredCondition
+import com.willfp.libreforge.conditions.emptyConditionList
+import com.willfp.libreforge.effects.EffectList
+import com.willfp.libreforge.effects.emptyEffectList
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -50,18 +58,18 @@ abstract class EcoEnchant(
     override val displayName = config.getFormattedString("display-name")
     override val unformattedDisplayName = config.getString("display-name")
 
-    val conditions: Set<ConfiguredCondition>
+    val conditions: ConditionList
 
     val targets = config.getStrings("targets")
-        .mapNotNull { EnchantmentTargets.getByID(it) }
+        .mapNotNull { EnchantmentTargets[it] }
 
     val slots: Set<TargetSlot>
         get() = targets.map { it.slot }.toSet()
 
-    override val type = EnchantmentTypes.getByID(config.getString("type")) ?: EnchantmentTypes.values().first()
+    override val type = EnchantmentTypes[config.getString("type")] ?: EnchantmentTypes.values().first()
 
     override val enchantmentRarity =
-        EnchantmentRarities.getByID(config.getString("rarity")) ?: EnchantmentRarities.values().first()
+        EnchantmentRarities[config.getString("rarity")] ?: EnchantmentRarities.values().first()
 
     private val conflictNames = config.getStrings("conflicts")
 
@@ -116,17 +124,18 @@ abstract class EcoEnchant(
         checkDependencies()
 
         config.injectPlaceholders(
-            PlayerStaticPlaceholder(
-                "level"
-            ) { p ->
-                p.getEnchantLevel(this).toString()
+            object : SimpleInjectablePlaceholder("level") {
+                override fun getValue(args: String, context: PlaceholderContext): String? {
+                    return context.itemStack?.fast()?.getEnchantmentLevel(this@EcoEnchant)?.toString()
+                }
             }
         )
 
-        conditions = if (plugin.isLoaded) Conditions.compile(
+        conditions = Conditions.compile(
             config.getSubsections("conditions"),
-            "Enchantment $id"
-        ) else emptySet()
+            if (plugin.isLoaded) ViolationContext(plugin, "Enchantment $id")
+            else SilentViolationContext
+        )
 
         if (Bukkit.getPluginManager().getPermission("ecoenchants.fromtable.$id") == null) {
             val permission = Permission(
@@ -164,7 +173,7 @@ abstract class EcoEnchant(
     }
 
     private fun checkDependencies() {
-        val missingPlugins = mutableListOf<String>()
+        val missingPlugins = mutableSetOf<String>()
 
         for (dependency in config.getStrings("dependencies")) {
             if (!Bukkit.getPluginManager().plugins.map { it.name }.containsIgnoreCase(dependency)) {
@@ -195,7 +204,7 @@ abstract class EcoEnchant(
     }
 
     open fun createLevel(level: Int) =
-        EcoEnchantLevel(this, level, emptySet(), conditions)
+        EcoEnchantLevel(this, level, emptyEffectList(), conditions, plugin)
 
     fun registerListener(listener: Listener) {
         this.plugin.eventManager.registerListener(listener)

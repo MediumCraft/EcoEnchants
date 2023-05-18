@@ -1,7 +1,7 @@
 package com.willfp.ecoenchants.enchants
 
 import com.github.benmanes.caffeine.cache.Caffeine
-import com.willfp.eco.core.config.updating.ConfigUpdater
+import com.willfp.eco.core.config.base.LangYml
 import com.willfp.eco.core.drops.DropQueue
 import com.willfp.eco.core.fast.fast
 import com.willfp.eco.core.gui.GUIComponent
@@ -37,9 +37,7 @@ object EnchantGUI {
     private lateinit var menu: Menu
     private val enchantInfoMenus = Caffeine.newBuilder().build<EcoEnchant, Menu>()
 
-    @JvmStatic
-    @ConfigUpdater
-    fun update(plugin: EcoEnchantsPlugin) {
+    internal fun reload(plugin: EcoEnchantsPlugin) {
         menu = menu(plugin.configYml.getInt("enchant-gui.rows")) {
             title = plugin.configYml.getFormattedString("enchant-gui.title")
 
@@ -261,6 +259,9 @@ private fun EcoEnchant.getInformationSlot(plugin: EcoEnchantsPlugin): Slot {
                                         }.ifEmpty { plugin.langYml.getFormattedString("no-conflicts").toWrappable() }
                                     }
                                 )
+                                .replace("%tradeable%", this.isTradeable.parseYesOrNo(plugin.langYml))
+                                .replace("%discoverable%", this.isDiscoverable.parseYesOrNo(plugin.langYml))
+                                .replace("%enchantable%", this.isEnchantable.parseYesOrNo(plugin.langYml))
                         }
                         .flatMap {
                             WordUtils.wrap(it, 45, "\n", false)
@@ -278,4 +279,8 @@ private fun EcoEnchant.getInformationSlot(plugin: EcoEnchantsPlugin): Slot {
                 .build()
         )
     }
+}
+
+fun Boolean.parseYesOrNo(langYml: LangYml): String {
+    return if (this)  langYml.getFormattedString("yes") else langYml.getFormattedString("no")
 }

@@ -1,10 +1,10 @@
 package com.willfp.ecoenchants.mechanics
 
-import com.willfp.eco.core.config.updating.ConfigUpdater
 import com.willfp.eco.core.items.Items
 import com.willfp.eco.core.items.TestableItem
 import com.willfp.eco.core.recipe.parts.EmptyTestableItem
 import com.willfp.eco.util.NumberUtils
+import com.willfp.eco.util.randDouble
 import com.willfp.ecoenchants.EcoEnchantsPlugin
 import com.willfp.ecoenchants.enchants.EcoEnchant
 import com.willfp.ecoenchants.enchants.EcoEnchants
@@ -122,7 +122,12 @@ class EnchantingTableSupport(
             val maxLevel = enchantment.maxLevel
             val maxObtainableLevel = plugin.configYml.getInt("enchanting-table.maximum-obtainable-level")
 
-            val levelPart1 = cost / maxObtainableLevel.toDouble()
+            val levelPart1 = if (enchantment.type.highLevelBias > 0) {
+                randDouble(0.0, 1.0)
+            } else {
+                cost / maxObtainableLevel.toDouble()
+            }
+
             val levelPart2 = NumberUtils.bias(levelPart1, enchantment.type.highLevelBias)
             val levelPart3 = NumberUtils.triangularDistribution(0.0, 1.0, levelPart2)
             val level = ceil(levelPart3 * maxLevel).coerceIn(1.0..maxLevel.toDouble()).toInt()
@@ -175,7 +180,7 @@ class EnchantingTableSupport(
         perfectly, it's effectively 1:1 with vanilla if memory serves, so I'm not going to rewrite it.
          */
 
-        event.offers.getOrNull(2)?.cost = min(event.offers[2].cost, maxObtainableLevel)
+        event.offers.getOrNull(2)?.cost = min(event.offers[2]?.cost ?: 0, maxObtainableLevel)
 
         val bonus = event.enchantmentBonus.coerceIn(1..15)
 
@@ -215,9 +220,9 @@ class EnchantingTableSupport(
         }
 
         ExtraItemSupport.currentlyEnchantingExtraItem[event.enchanter.uniqueId] = arrayOf(
-            event.offers[0].enchantmentLevel,
-            event.offers[1].enchantmentLevel,
-            event.offers[2].enchantmentLevel
+            event.offers[0]?.enchantmentLevel ?: 0,
+            event.offers[1]?.enchantmentLevel ?: 0,
+            event.offers[2]?.enchantmentLevel ?: 0
         )
     }
 }
@@ -227,9 +232,7 @@ object ExtraItemSupport {
 
     internal val extraEnchantableItems = mutableListOf<TestableItem>()
 
-    @JvmStatic
-    @ConfigUpdater
-    fun reload(plugin: EcoEnchantsPlugin) {
+    internal fun reload(plugin: EcoEnchantsPlugin) {
         extraEnchantableItems.clear()
         extraEnchantableItems.addAll(plugin.targetsYml.getStrings("extra-enchantable-items").map {
             Items.lookup(it)

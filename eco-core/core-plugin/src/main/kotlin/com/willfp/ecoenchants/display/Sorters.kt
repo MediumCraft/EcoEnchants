@@ -1,6 +1,5 @@
 package com.willfp.ecoenchants.display
 
-import com.willfp.eco.core.config.updating.ConfigUpdater
 import com.willfp.ecoenchants.EcoEnchantsPlugin
 import com.willfp.ecoenchants.enchants.wrap
 import com.willfp.ecoenchants.rarity.EnchantmentRarities
@@ -17,9 +16,7 @@ interface EnchantmentSorter {
 object EnchantSorter {
     private val sorters = mutableListOf<EnchantmentSorter>()
 
-    @JvmStatic
-    @ConfigUpdater
-    fun update(plugin: EcoEnchantsPlugin) {
+    internal fun reload(plugin: EcoEnchantsPlugin) {
         sorters.clear()
 
         if (plugin.configYml.getBool("display.sort.rarity")) {
@@ -57,12 +54,10 @@ object LengthSorter : EnchantmentSorter {
 object TypeSorter : EnchantmentSorter {
     private val types = mutableListOf<EnchantmentType>()
 
-    @JvmStatic
-    @ConfigUpdater
     fun update(plugin: EcoEnchantsPlugin) {
         types.clear()
         types.addAll(plugin.configYml.getStrings("display.sort.type-order").mapNotNull {
-            EnchantmentTypes.getByID(it)
+            EnchantmentTypes[it]
         })
     }
 
@@ -86,12 +81,10 @@ object TypeSorter : EnchantmentSorter {
 object RaritySorter : EnchantmentSorter {
     private val rarities = mutableListOf<EnchantmentRarity>()
 
-    @JvmStatic
-    @ConfigUpdater
     fun update(plugin: EcoEnchantsPlugin) {
         rarities.clear()
         rarities.addAll(plugin.configYml.getStrings("display.sort.rarity-order").mapNotNull {
-            EnchantmentRarities.getByID(it)
+            EnchantmentRarities[it]
         })
     }
 
